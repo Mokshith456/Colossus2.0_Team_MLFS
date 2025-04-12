@@ -13,11 +13,11 @@ load_dotenv()
 class DisorderAgent:
     def __init__(self, collection_name):
         # Initialize OpenAI client instead of Groq
-        api_key = os.getenv("OPENAI_API_KEY")
-        if not api_key:
-            raise ValueError("Missing OPENAI_API_KEY in .env file")
+        self.client = OpenAI(
+            api_key="AIzaSyCs6BZTPH7x8sY9HmejW-RO_kSW1Luul70",
+            base_url="https://generativelanguage.googleapis.com/v1beta/openai/"
+        )
         
-        self.client = OpenAI(api_key=api_key)
         self.collection_name = collection_name
         
         # Initialize ChromaDB vector store
@@ -73,13 +73,10 @@ class DisorderAgent:
             - Role-play scenarios using words with /r/.
             - Articulation games that reward correct pronunciation.
             - Flashcard drills to reinforce word-level accuracy.
-        - **Week 4:**
-          - Target sounds: /r/ in sentences
-          - Therapy focus: Integrate /r/ sounds into natural speech
-          - Home practice:
             - Conversational exercises in natural settings.
             - Use of RTM tools for remote feedback and correction.
-            - Sentence-building activities that incorporate /r/ sounds.
+        - **References**:
+          - print the references in the format of [1] [2] [3] etc.which is being taken from the context of the vector database.
 
         **Instructions for AI**:
         - Focus on generating detailed and engaging exercises for each week.
@@ -304,13 +301,14 @@ class DisorderAgent:
         
         # Generate response using OpenAI GPT-3.5 Turbo
         response = self.client.chat.completions.create(
-            model="gpt-3.5-turbo",
+            model="gemini-2.0-flash",
             messages=[
                 {"role": "system", "content": "You are a speech therapy expert assistant."},
                 {"role": "user", "content": prompt}
             ],
             temperature=0.2,
-            max_tokens=1024
+            max_tokens=2048,
+            top_p=0.95
         )
         
         return response.choices[0].message.content

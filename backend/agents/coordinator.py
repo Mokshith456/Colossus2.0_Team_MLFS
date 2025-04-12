@@ -12,7 +12,9 @@ class MultiDisorderCoordinator:
         self.agents = {
             "articulation": self._create_agent("Articulation"),
             "fluency": self._create_agent("Fluency_disorders"),
-            "voice": self._create_agent("Voice_disorders")
+            "voice": self._create_agent("Voice_disorders"),
+            "language": self._create_agent("Language_disorders"),
+            "motor_speech": self._create_agent("Motor_speech_disorder"),
         }
 
     def _create_agent(self, collection_name):
