@@ -1,7 +1,7 @@
 import sys
 import os
 import traceback
-from flask import Flask, request, jsonify
+from flask import Flask, request, jsonify, send_from_directory, send_file
 from flask_cors import CORS
 from flask_sqlalchemy import SQLAlchemy
 import sqlite3
@@ -355,21 +355,52 @@ def save_recording():
             return jsonify({'error': 'No audio file provided'}), 400
             
         audio_file = request.files['audio']
+        disorder_type = request.form.get('disorder_type')
+        
         if audio_file.filename == '':
             return jsonify({'error': 'No selected file'}), 400
+            
+        if not disorder_type:
+            return jsonify({'error': 'No disorder type provided'}), 400
             
         # Create recordings directory if it doesn't exist
         os.makedirs('recordings', exist_ok=True)
         
-        # Save the file
+        # Save the audio file
         filepath = os.path.join('recordings', audio_file.filename)
         audio_file.save(filepath)
         
-        return jsonify({'message': 'Recording saved successfully'})
+        # Save the disorder type to disorder.txt
+        disorder_txt_path = os.path.join('recordings', 'disorder.txt')
+        with open(disorder_txt_path, 'w') as f:
+            f.write(disorder_type)
+        
+        return jsonify({'message': 'Recording and disorder type saved successfully'})
         
     except Exception as e:
         print('Error saving recording:', str(e))
         return jsonify({'error': 'Failed to save recording'}), 500
+
+@app.route("/list-recordings", methods=["GET"])
+def list_recordings():
+    recordings_dir = os.path.join(os.path.dirname(__file__), "recordings")
+    if not os.path.exists(recordings_dir):
+        return jsonify({"recordings": []})
+    
+    recordings = [f for f in os.listdir(recordings_dir) if f.endswith('.wav')]
+    return jsonify({"recordings": recordings})
+
+@app.route("/recordings/<filename>")
+def serve_recording(filename):
+    recordings_dir = os.path.join(os.path.dirname(__file__), "recordings")
+    try:
+        return send_file(
+            os.path.join(recordings_dir, filename),
+            mimetype="audio/wav",
+            as_attachment=False
+        )
+    except Exception as e:
+        return jsonify({"error": str(e)}), 404
 
 # ─────────────────────────────────────────
 # Entry Point

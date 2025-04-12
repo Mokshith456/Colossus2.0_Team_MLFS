@@ -1,7 +1,8 @@
 // frontend/src/components/Doctor/ScheduleMeeting.js
-import { useState } from "react";
+import React, { useState } from "react";
 import axios from "../../services/api";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
+import Logo from "../Logo";
 
 export default function ScheduleMeeting() {
     const [email, setEmail] = useState("");
@@ -31,6 +32,7 @@ export default function ScheduleMeeting() {
             bottom: 0,
             overflow: "auto"
         }}>
+            <Logo position="bottom-right" />
             {/* Navigation Bar */}
             <nav style={{
                 padding: "1rem 2rem",
@@ -73,6 +75,12 @@ export default function ScheduleMeeting() {
                         fontWeight: "500",
                         fontSize: "16px"
                     }}>View Feedbacks</Link>
+                    <Link to="/doctor/recordings" style={{
+                        color: "#64748b",
+                        textDecoration: "none",
+                        fontWeight: "500",
+                        fontSize: "16px"
+                    }}>Patient Recordings</Link>
                 </div>
                 <Link to="/" style={{
                     position: "absolute",

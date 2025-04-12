@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import axios from '../../services/api';
+import Logo from "../Logo";
 
 export default function ViewFeedbacks() {
     const [feedbacks, setFeedbacks] = useState([]);
@@ -51,6 +52,7 @@ export default function ViewFeedbacks() {
             bottom: 0,
             overflow: "auto"
         }}>
+            <Logo position="bottom-right" />
             {/* Navigation Bar */}
             <nav style={{
                 padding: "0.75rem 1.5rem",
@@ -76,12 +78,86 @@ export default function ViewFeedbacks() {
                         display: "flex",
                         gap: "1rem"
                     }}>
-                        <span style={{
-                            color: "#4b5563",
-                            fontSize: "14px",
-                            fontWeight: "500",
-                            padding: "0.4rem 0.75rem"
-                        }}>Patient Feedbacks</span>
+                        <button
+                            onClick={() => navigate("/doctor/upload")}
+                            style={{
+                                color: "#64748b",
+                                textDecoration: "none",
+                                fontWeight: "500",
+                                fontSize: "14px",
+                                padding: "0.4rem 0.75rem",
+                                borderRadius: "6px",
+                                border: "1px solid #e2e8f0",
+                                background: "transparent",
+                                cursor: "pointer"
+                            }}
+                        >
+                            Upload Report
+                        </button>
+                        <button
+                            onClick={() => navigate("/doctor/schedule")}
+                            style={{
+                                color: "#64748b",
+                                textDecoration: "none",
+                                fontWeight: "500",
+                                fontSize: "14px",
+                                padding: "0.4rem 0.75rem",
+                                borderRadius: "6px",
+                                border: "1px solid #e2e8f0",
+                                background: "transparent",
+                                cursor: "pointer"
+                            }}
+                        >
+                            Schedule Meeting
+                        </button>
+                        <button
+                            onClick={() => navigate("/doctor/register")}
+                            style={{
+                                color: "#64748b",
+                                textDecoration: "none",
+                                fontWeight: "500",
+                                fontSize: "14px",
+                                padding: "0.4rem 0.75rem",
+                                borderRadius: "6px",
+                                border: "1px solid #e2e8f0",
+                                background: "transparent",
+                                cursor: "pointer"
+                            }}
+                        >
+                            Register Patient
+                        </button>
+                        <button
+                            onClick={() => navigate("/doctor/feedbacks")}
+                            style={{
+                                color: "#3b82f6",
+                                textDecoration: "none",
+                                fontWeight: "600",
+                                fontSize: "14px",
+                                padding: "0.4rem 0.75rem",
+                                borderRadius: "6px",
+                                border: "1px solid #e2e8f0",
+                                background: "transparent",
+                                cursor: "pointer"
+                            }}
+                        >
+                            View Feedbacks
+                        </button>
+                        <button
+                            onClick={() => navigate("/doctor/recordings")}
+                            style={{
+                                color: "#64748b",
+                                textDecoration: "none",
+                                fontWeight: "500",
+                                fontSize: "14px",
+                                padding: "0.4rem 0.75rem",
+                                borderRadius: "6px",
+                                border: "1px solid #e2e8f0",
+                                background: "transparent",
+                                cursor: "pointer"
+                            }}
+                        >
+                            Patient Recordings
+                        </button>
                     </div>
                 </div>
                 <div style={{

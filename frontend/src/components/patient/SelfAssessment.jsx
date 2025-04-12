@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
+import Logo from "../Logo";
 
 const articulationQuestions = [
     "Do you substitute sounds (e.g., 'thun' for 'sun')?",
@@ -271,6 +272,7 @@ export default function SelfAssessment() {
             bottom: 0,
             overflow: "auto"
         }}>
+            <Logo position="bottom-right" />
             {/* Navigation Bar */}
             <nav style={{
                 padding: "0.75rem 1.5rem",

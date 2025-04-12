@@ -1,5 +1,6 @@
 import React from 'react';
 import { Link, useNavigate } from "react-router-dom";
+import Logo from "../Logo";
 
 export default function PatientDashboard() {
     const navigate = useNavigate();
@@ -24,6 +25,7 @@ export default function PatientDashboard() {
             bottom: 0,
             overflow: "auto"
         }}>
+            <Logo position="bottom-right" />
             {/* Navigation Bar */}
             <nav style={{
                 padding: "0.75rem 1.5rem",

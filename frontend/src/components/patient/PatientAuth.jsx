@@ -1,6 +1,7 @@
-import { useState } from "react";
+import React, { useState } from "react";
 import axios from "../../services/api";
 import { useNavigate } from "react-router-dom";
+import Logo from "../Logo";
 
 export default function PatientAuth() {
     const [form, setForm] = useState({ username: "", password: "" });
@@ -105,6 +106,7 @@ export default function PatientAuth() {
             right: 0,
             bottom: 0
         }}>
+            <Logo />
             <div style={{
                 width: "90%",
                 maxWidth: "400px",

@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import axios from '../../services/api';
+import Logo from "../Logo";
 
 export default function GiveFeedback() {
     const [feedback, setFeedback] = useState('');
@@ -50,6 +51,7 @@ export default function GiveFeedback() {
             bottom: 0,
             overflow: "auto"
         }}>
+            <Logo position="bottom-right" />
             {/* Navigation Bar */}
             <nav style={{
                 padding: "0.75rem 1.5rem",

@@ -1,6 +1,7 @@
 import { useState } from "react";
 import axios from "../../services/api";
 import { Link } from "react-router-dom";
+import Logo from "../Logo";
 
 export default function RegisterPatient() {
     const [form, setForm] = useState({
@@ -71,6 +72,7 @@ export default function RegisterPatient() {
             bottom: 0,
             overflow: "auto"
         }}>
+            <Logo position="bottom-right" />
             {/* Navigation Bar */}
             <nav style={{
                 padding: "0.75rem 1.5rem",
@@ -113,6 +115,12 @@ export default function RegisterPatient() {
                         fontWeight: "500",
                         fontSize: "15px"
                     }}>View Feedbacks</Link>
+                    <Link to="/doctor/recordings" style={{
+                        color: "#64748b",
+                        textDecoration: "none",
+                        fontWeight: "500",
+                        fontSize: "15px"
+                    }}>Patient Recordings</Link>
                 </div>
                 <Link to="/" style={{
                     position: "absolute",

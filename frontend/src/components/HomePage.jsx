@@ -1,5 +1,6 @@
 import React from "react";
 import { useNavigate } from "react-router-dom";
+import Logo from "./Logo";
 
 export default function HomePage() {
     const navigate = useNavigate();
@@ -7,6 +8,7 @@ export default function HomePage() {
     return (
         <div style={{
             display: "flex",
+            flexDirection: "column",
             justifyContent: "center",
             alignItems: "center",
             minHeight: "100vh",
@@ -18,6 +20,37 @@ export default function HomePage() {
             overflow: "hidden",
             boxSizing: "border-box"
         }}>
+            <Logo />
+            {/* Title Section */}
+            <div style={{
+                textAlign: "center",
+                marginBottom: "4rem",
+                position: "relative",
+                zIndex: "2"
+            }}>
+                <h1 style={{
+                    fontSize: "2.5rem",
+                    color: "#1e40af",
+                    marginBottom: "1rem",
+                    fontWeight: "700",
+                    letterSpacing: "-0.025em",
+                    lineHeight: "1.2",
+                    textShadow: "0 2px 4px rgba(0,0,0,0.1)"
+                }}>
+                    Reclaiming Voice
+                </h1>
+                <h2 style={{
+                    fontSize: "1.5rem",
+                    color: "#3b82f6",
+                    fontWeight: "500",
+                    opacity: "0.9",
+                    maxWidth: "600px",
+                    margin: "0 auto"
+                }}>
+                    AI for Accessible and Empathetic Therapy
+                </h2>
+            </div>
+
             {/* Animated Background Shapes */}
             <div style={{
                 position: "absolute",
@@ -75,14 +108,21 @@ export default function HomePage() {
                         color: "#166534",
                         marginBottom: "1.5rem",
                         fontWeight: "700",
-                        letterSpacing: "-0.5px"
-                    }}>Doctor Side</h2>
+                        letterSpacing: "-0.5px",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        gap: "0.5rem"
+                    }}>
+                        <span>🩺</span>
+                        Doctor
+                    </h2>
                     <p style={{
                         color: "#15803d",
                         fontSize: "18px",
                         opacity: "0.9",
                         fontWeight: "500"
-                    }}>Go to Upload Reports</p>
+                    }}>Login/Signup</p>
                 </div>
 
                 {/* Dividing Line */}
@@ -142,8 +182,15 @@ export default function HomePage() {
                         color: "#1e40af",
                         marginBottom: "1.5rem",
                         fontWeight: "700",
-                        letterSpacing: "-0.5px"
-                    }}>Patient Side</h2>
+                        letterSpacing: "-0.5px",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        gap: "0.5rem"
+                    }}>
+                        <span>❤️‍🩹</span>
+                        Patient
+                    </h2>
                     <p style={{
                         color: "#1e3a8a",
                         fontSize: "18px",
@@ -151,6 +198,29 @@ export default function HomePage() {
                         fontWeight: "500"
                     }}>Login</p>
                 </div>
+            </div>
+
+            {/* Footer */}
+            <div style={{
+                position: "absolute",
+                bottom: "0",
+                left: "0",
+                width: "100%",
+                padding: "1rem",
+                textAlign: "center",
+                background: "rgba(255, 255, 255, 0.1)",
+                backdropFilter: "blur(8px)",
+                borderTop: "1px solid rgba(255, 255, 255, 0.2)",
+                zIndex: "2"
+            }}>
+                <p style={{
+                    color: "#4b5563",
+                    fontSize: "0.875rem",
+                    margin: "0",
+                    fontWeight: "500"
+                }}>
+                    © Done By Team MLFS - With Pain ❤️
+                </p>
             </div>
         </div>
     );

@@ -1,6 +1,7 @@
 import React, { useEffect, useState, useRef } from "react";
 import axios from "../../services/api";
 import { useNavigate } from "react-router-dom";
+import Logo from "../Logo";
 
 export default function ViewPlan() {
     const [disorder, setDisorder] = useState("articulation");
@@ -109,6 +110,7 @@ export default function ViewPlan() {
                 const blob = new Blob(chunks, { type: 'audio/wav' });
                 const formData = new FormData();
                 formData.append('audio', blob, `${questionId}.wav`);
+                formData.append('disorder_type', disorder);
 
                 try {
                     await axios.post('/save-recording', formData);
@@ -253,6 +255,7 @@ export default function ViewPlan() {
             bottom: 0,
             overflow: "auto"
         }}>
+            <Logo position="bottom-right" />
             {/* Add temporary alert */}
             {showAlert && (
                 <div style={{
