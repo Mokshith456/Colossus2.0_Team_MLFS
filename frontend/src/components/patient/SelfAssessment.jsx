@@ -21,7 +21,7 @@ const articulationQuestions = [
     "Does stress/emotion worsen articulation?",
     "Have you received prior speech therapy without resolution?",
     "Are nasal emissions present during speech?",
-    "Do you experience jaw fatigue during conversation?",
+    "Do you experience jaw fatigue during conversation?"
 ];
 
 const fluencyQuestions = [
@@ -173,73 +173,269 @@ export default function SelfAssessment() {
     };
 
     const renderQuestions = (questions, stepType, answers) => (
-        questions.map((q, idx) => (
-            <div key={idx} style={{ marginBottom: "1rem" }}>
-                <p>{idx + 1}. {q}</p>
-                <label>
-                    <input
-                        type="radio"
-                        name={`${stepType}-${idx}`}
-                        value="yes"
-                        onChange={() => handleChange(stepType, idx, "yes")}
-                        checked={answers[idx] === "yes"}
-                    /> Yes
-                </label>
-                <label style={{ marginLeft: "1rem" }}>
-                    <input
-                        type="radio"
-                        name={`${stepType}-${idx}`}
-                        value="no"
-                        onChange={() => handleChange(stepType, idx, "no")}
-                        checked={answers[idx] === "no"}
-                    /> No
-                </label>
-            </div>
-        ))
+        <div style={{ marginTop: "1rem" }}>
+            {questions.map((q, idx) => (
+                <div key={idx} style={{
+                    background: "white",
+                    padding: "1rem",
+                    borderRadius: "8px",
+                    marginBottom: "0.75rem",
+                    boxShadow: "0 1px 2px rgba(0,0,0,0.05)"
+                }}>
+                    <p style={{
+                        fontSize: "15px",
+                        color: "#1e293b",
+                        marginBottom: "0.5rem",
+                        fontWeight: "500"
+                    }}>{idx + 1}. {q}</p>
+                    <div style={{
+                        display: "flex",
+                        gap: "1rem"
+                    }}>
+                        <label style={{
+                            display: "flex",
+                            alignItems: "center",
+                            gap: "0.35rem",
+                            cursor: "pointer"
+                        }}>
+                            <input
+                                type="radio"
+                                name={`${stepType}-${idx}`}
+                                value="yes"
+                                onChange={() => handleChange(stepType, idx, "yes")}
+                                checked={answers[idx] === "yes"}
+                                style={{ cursor: "pointer" }}
+                            />
+                            <span style={{ color: "#64748b", fontSize: "14px" }}>Yes</span>
+                        </label>
+                        <label style={{
+                            display: "flex",
+                            alignItems: "center",
+                            gap: "0.35rem",
+                            cursor: "pointer"
+                        }}>
+                            <input
+                                type="radio"
+                                name={`${stepType}-${idx}`}
+                                value="no"
+                                onChange={() => handleChange(stepType, idx, "no")}
+                                checked={answers[idx] === "no"}
+                                style={{ cursor: "pointer" }}
+                            />
+                            <span style={{ color: "#64748b", fontSize: "14px" }}>No</span>
+                        </label>
+                    </div>
+                </div>
+            ))}
+        </div>
+    );
+
+    const renderResults = (type, result) => (
+        <div style={{
+            background: "white",
+            padding: "1rem",
+            borderRadius: "8px",
+            marginBottom: "0.75rem",
+            boxShadow: "0 1px 2px rgba(0,0,0,0.05)"
+        }}>
+            <h3 style={{
+                fontSize: "16px",
+                color: "#1e40af",
+                marginBottom: "0.5rem",
+                fontWeight: "600"
+            }}>{type} Assessment Result</h3>
+            <p style={{
+                color: "#64748b",
+                fontSize: "14px",
+                marginBottom: "0.25rem"
+            }}>Yes Answers: {result.yesCount}</p>
+            <p style={{
+                color: "#64748b",
+                fontSize: "14px",
+                fontWeight: "500"
+            }}>Severity: {result.severity}</p>
+        </div>
     );
 
     return (
-        <div style={{ maxWidth: "700px", margin: "2rem auto" }}>
-            {step === 1 && <><h2>Step 1: Articulation Disorders Assessment</h2>{renderQuestions(articulationQuestions, "articulation", articulationAnswers)}</>}
-            {step === 2 && <><h2>Step 2: Fluency Disorders Assessment</h2>{renderQuestions(fluencyQuestions, "fluency", fluencyAnswers)}</>}
-            {step === 3 && <><h2>Step 3: Voice Disorders Assessment</h2>{renderQuestions(voiceQuestions, "voice", voiceAnswers)}</>}
-            {step === 4 && <><h2>Step 4: Language Disorders Assessment</h2>{renderQuestions(languageQuestions, "language", languageAnswers)}</>}
+        <div style={{
+            minHeight: "100vh",
+            width: "100vw",
+            margin: 0,
+            padding: 0,
+            background: "linear-gradient(135deg, #f0f4ff 0%, #e6eeff 50%, #f0f4ff 100%)",
+            position: "fixed",
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            overflow: "auto"
+        }}>
+            {/* Navigation Bar */}
+            <nav style={{
+                padding: "0.75rem 1.5rem",
+                background: "white",
+                boxShadow: "0 1px 2px rgba(0,0,0,0.1)",
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center"
+            }}>
+                <h1 style={{
+                    fontSize: "20px",
+                    color: "#1e40af",
+                    margin: 0,
+                    fontWeight: "700"
+                }}>Self Assessment</h1>
+                <button
+                    onClick={() => navigate("/patient/dashboard")}
+                    style={{
+                        color: "#64748b",
+                        textDecoration: "none",
+                        fontWeight: "500",
+                        fontSize: "14px",
+                        padding: "0.4rem 0.75rem",
+                        borderRadius: "6px",
+                        border: "1px solid #e2e8f0",
+                        background: "transparent",
+                        cursor: "pointer",
+                        transition: "all 0.2s ease"
+                    }}
+                >Back to Dashboard</button>
+            </nav>
 
-            <button onClick={handleSubmit} style={{ padding: "10px 20px" }}>
-                Submit Step {step}
-            </button>
-
-            {results.articulation && step >= 2 && (
-                <div style={{ marginTop: "2rem" }}>
-                    <h3>Step 1 Result</h3>
-                    <p>Yes Answers: {results.articulation.yesCount}</p>
-                    <p>Severity: {results.articulation.severity}</p>
+            {/* Main Content */}
+            <div style={{
+                maxWidth: "800px",
+                margin: "1rem auto",
+                padding: "0 1.5rem"
+            }}>
+                {/* Progress Bar */}
+                <div style={{
+                    display: "flex",
+                    justifyContent: "space-between",
+                    alignItems: "center",
+                    marginBottom: "1rem",
+                    background: "white",
+                    padding: "0.75rem",
+                    borderRadius: "8px",
+                    boxShadow: "0 1px 2px rgba(0,0,0,0.05)"
+                }}>
+                    {[1, 2, 3, 4].map((s) => (
+                        <div key={s} style={{
+                            display: "flex",
+                            alignItems: "center"
+                        }}>
+                            <div style={{
+                                width: "28px",
+                                height: "28px",
+                                borderRadius: "50%",
+                                background: step >= s ? "#1e40af" : "#e2e8f0",
+                                color: "white",
+                                display: "flex",
+                                alignItems: "center",
+                                justifyContent: "center",
+                                fontWeight: "600",
+                                fontSize: "13px"
+                            }}>{s}</div>
+                            {s < 4 && (
+                                <div style={{
+                                    height: "2px",
+                                    width: "80px",
+                                    background: step > s ? "#1e40af" : "#e2e8f0",
+                                    margin: "0 0.35rem"
+                                }} />
+                            )}
+                        </div>
+                    ))}
                 </div>
-            )}
 
-            {results.fluency && step >= 3 && (
-                <div style={{ marginTop: "2rem" }}>
-                    <h3>Step 2 Result</h3>
-                    <p>Yes Answers: {results.fluency.yesCount}</p>
-                    <p>Severity: {results.fluency.severity}</p>
-                </div>
-            )}
+                {/* Assessment Steps */}
+                <div style={{
+                    background: "white",
+                    padding: "1.5rem",
+                    borderRadius: "12px",
+                    boxShadow: "0 2px 4px rgba(0,0,0,0.1)"
+                }}>
+                    {step === 1 && (
+                        <>
+                            <h2 style={{
+                                fontSize: "20px",
+                                color: "#1e293b",
+                                marginBottom: "0.75rem",
+                                fontWeight: "600"
+                            }}>Step 1: Articulation Disorders Assessment</h2>
+                            {renderQuestions(articulationQuestions, "articulation", articulationAnswers)}
+                        </>
+                    )}
+                    {step === 2 && (
+                        <>
+                            <h2 style={{
+                                fontSize: "20px",
+                                color: "#1e293b",
+                                marginBottom: "0.75rem",
+                                fontWeight: "600"
+                            }}>Step 2: Fluency Disorders Assessment</h2>
+                            {renderQuestions(fluencyQuestions, "fluency", fluencyAnswers)}
+                        </>
+                    )}
+                    {step === 3 && (
+                        <>
+                            <h2 style={{
+                                fontSize: "20px",
+                                color: "#1e293b",
+                                marginBottom: "0.75rem",
+                                fontWeight: "600"
+                            }}>Step 3: Voice Disorders Assessment</h2>
+                            {renderQuestions(voiceQuestions, "voice", voiceAnswers)}
+                        </>
+                    )}
+                    {step === 4 && (
+                        <>
+                            <h2 style={{
+                                fontSize: "20px",
+                                color: "#1e293b",
+                                marginBottom: "0.75rem",
+                                fontWeight: "600"
+                            }}>Step 4: Language Disorders Assessment</h2>
+                            {renderQuestions(languageQuestions, "language", languageAnswers)}
+                        </>
+                    )}
 
-            {results.voice && step >= 4 && (
-                <div style={{ marginTop: "2rem" }}>
-                    <h3>Step 3 Result</h3>
-                    <p>Yes Answers: {results.voice.yesCount}</p>
-                    <p>Severity: {results.voice.severity}</p>
-                </div>
-            )}
+                    {/* Results Section */}
+                    {results.articulation && step >= 2 && renderResults("Step 1", results.articulation)}
+                    {results.fluency && step >= 3 && renderResults("Step 2", results.fluency)}
+                    {results.voice && step >= 4 && renderResults("Step 3", results.voice)}
+                    {results.language && step === 4 && renderResults("Step 4", results.language)}
 
-            {results.language && step === 4 && (
-                <div style={{ marginTop: "2rem" }}>
-                    <h3>Step 4 Result</h3>
-                    <p>Yes Answers: {results.language.yesCount}</p>
-                    <p>Severity: {results.language.severity}</p>
+                    {/* Submit Button */}
+                    <button
+                        onClick={handleSubmit}
+                        style={{
+                            width: "100%",
+                            padding: "0.75rem",
+                            fontSize: "15px",
+                            fontWeight: "600",
+                            color: "white",
+                            backgroundColor: "#1e40af",
+                            border: "none",
+                            borderRadius: "6px",
+                            cursor: "pointer",
+                            marginTop: "1.5rem",
+                            transition: "transform 0.2s ease, box-shadow 0.2s ease"
+                        }}
+                        onMouseEnter={(e) => {
+                            e.currentTarget.style.transform = "translateY(-2px)";
+                            e.currentTarget.style.boxShadow = "0 4px 6px rgba(0, 0, 0, 0.1)";
+                        }}
+                        onMouseLeave={(e) => {
+                            e.currentTarget.style.transform = "translateY(0)";
+                            e.currentTarget.style.boxShadow = "none";
+                        }}
+                    >
+                        {step < 4 ? `Continue to Step ${step + 1}` : "Complete Assessment"}
+                    </button>
                 </div>
-            )}
+            </div>
         </div>
     );
 }

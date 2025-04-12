@@ -4,6 +4,9 @@ import traceback
 from flask import Flask, request, jsonify
 from flask_cors import CORS
 from flask_sqlalchemy import SQLAlchemy
+import sqlite3
+from sqlite3 import Error
+import shutil
 
 # Add root directory to sys.path so 'agents' can be imported
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
@@ -71,11 +74,11 @@ def upload_report():
     return jsonify({"message": "Report uploaded"})
 
 @app.route("/get-feedbacks", methods=["GET"])
-def get_feedbacks():
+def get_old_feedbacks():
     return jsonify(feedbacks)
 
 @app.route("/submit-feedback", methods=["POST"])
-def submit_feedback():
+def submit_old_feedback():
     data = request.json
     feedbacks.append({"email": data["email"], "message": data["message"]})
     return jsonify({"message": "Feedback received"})
@@ -157,6 +160,12 @@ def login_doctor():
         return jsonify({"message": "Login successful"})
     return jsonify({"error": "Invalid credentials"}), 401
 
+def clear_recordings_folder():
+    recordings_dir = os.path.join(BASE_DIR, 'recordings')
+    if os.path.exists(recordings_dir):
+        shutil.rmtree(recordings_dir)
+    os.makedirs(recordings_dir, exist_ok=True)
+
 @app.route("/generate-plan", methods=["POST"])
 def generate_plan():
     data = request.json
@@ -179,14 +188,188 @@ def generate_plan():
     }
 
     try:
+        # Clear recordings folder before generating new plan
+        clear_recordings_folder()
+        
         coordinator = MultiDisorderCoordinator()
         plan = coordinator.get_weekly_plan(disorder_type, profile)
         return jsonify({"plan": plan})
     except Exception as e:
         print("ERROR:", str(e))
-        traceback.print_exc()  # <-- ✅ Add this to show full backend error
+        traceback.print_exc()
         return jsonify({"error": str(e)}), 500
 
+# Create feedback table
+def create_feedback_table():
+    try:
+        conn = sqlite3.connect('feedback.db')
+        cursor = conn.cursor()
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS feedbacks (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                patientUsername TEXT NOT NULL,
+                feedback TEXT NOT NULL,
+                date TEXT NOT NULL
+            )
+        ''')
+        conn.commit()
+    except Error as e:
+        print(f"Error creating feedback table: {e}")
+    finally:
+        if conn:
+            conn.close()
+
+# Create feedback table on startup
+create_feedback_table()
+
+# New SQLite feedback endpoints with unique names
+@app.route('/api/feedback', methods=['POST'])
+def create_new_feedback():
+    data = request.get_json()
+    patientUsername = data.get('patientUsername')
+    feedback = data.get('feedback')
+    date = data.get('date')
+
+    if not all([patientUsername, feedback, date]):
+        return jsonify({'error': 'Missing required fields'}), 400
+
+    try:
+        conn = sqlite3.connect('feedback.db')
+        cursor = conn.cursor()
+        cursor.execute(
+            'INSERT INTO feedbacks (patientUsername, feedback, date) VALUES (?, ?, ?)',
+            (patientUsername, feedback, date)
+        )
+        conn.commit()
+        feedback_id = cursor.lastrowid
+        return jsonify({'success': True, 'id': feedback_id})
+    except Error as e:
+        return jsonify({'error': f'Failed to submit feedback: {str(e)}'}), 500
+    finally:
+        if conn:
+            conn.close()
+
+@app.route('/api/feedbacks', methods=['GET'])
+def get_all_feedbacks():
+    try:
+        conn = sqlite3.connect('feedback.db')
+        cursor = conn.cursor()
+        cursor.execute('SELECT * FROM feedbacks ORDER BY date DESC')
+        rows = cursor.fetchall()
+        
+        feedbacks = []
+        for row in rows:
+            feedbacks.append({
+                'id': row[0],
+                'patientUsername': row[1],
+                'feedback': row[2],
+                'date': row[3]
+            })
+        
+        return jsonify({'feedbacks': feedbacks})
+    except Error as e:
+        return jsonify({'error': f'Failed to fetch feedbacks: {str(e)}'}), 500
+    finally:
+        if conn:
+            conn.close()
+
+@app.route('/api/feedback/<int:id>', methods=['DELETE'])
+def delete_specific_feedback(id):
+    try:
+        conn = sqlite3.connect('feedback.db')
+        cursor = conn.cursor()
+        cursor.execute('DELETE FROM feedbacks WHERE id = ?', (id,))
+        conn.commit()
+        
+        if cursor.rowcount == 0:
+            return jsonify({'error': 'Feedback not found'}), 404
+            
+        return jsonify({'success': True})
+    except Error as e:
+        return jsonify({'error': f'Failed to delete feedback: {str(e)}'}), 500
+    finally:
+        if conn:
+            conn.close()
+
+@app.route("/get-assessment-questions", methods=["POST"])
+def get_assessment_questions():
+    data = request.json
+    disorder_type = data.get("disorder_type", "").lower()  # Convert to lowercase
+    
+    if not disorder_type:
+        return jsonify({"error": "Disorder type is required"}), 400
+        
+    try:
+        # Use the exact path provided
+        db_path = r"C:\Users\Mokshith P\Desktop\VOICE\speech-therapy-app\backend\db\speech_disorders_assessment.db"
+        print(f"Attempting to connect to database at: {db_path}")  # Debug log
+        
+        conn = sqlite3.connect(db_path)
+        cursor = conn.cursor()
+        
+        # Map the disorder type to the correct table name
+        table_names = {
+            'articulation': 'Articulation_Disorders',
+            'fluency': 'Fluency_Disorders',
+            'language': 'Language_Disorders',
+            'motor_speech': 'Motor_Speech_Disorders',
+            'voice': 'Voice_Disorders'
+        }
+        
+        if disorder_type not in table_names:
+            return jsonify({"error": f"Invalid disorder type: {disorder_type}"}), 400
+            
+        table_name = table_names[disorder_type]
+        print(f"Querying table: {table_name}")  # Debug log
+        
+        # Get 4 random questions using the correct column names
+        cursor.execute(f"""
+            SELECT Serial_No, Question 
+            FROM {table_name}
+            ORDER BY RANDOM() 
+            LIMIT 4
+        """)
+        
+        questions = cursor.fetchall()
+        print(f"Found {len(questions)} questions")  # Debug log
+        
+        if not questions:
+            return jsonify({"error": f"No questions found for {disorder_type} disorder"}), 404
+        
+        # Map using the correct column names
+        formatted_questions = [{"id": q[0], "question": q[1]} for q in questions]
+        return jsonify({"questions": formatted_questions})
+        
+    except Error as e:
+        error_msg = f"Database error: {str(e)}"
+        print(error_msg)  # Debug log
+        return jsonify({"error": error_msg}), 500
+    finally:
+        if 'conn' in locals():
+            conn.close()
+
+@app.route('/save-recording', methods=['POST'])
+def save_recording():
+    try:
+        if 'audio' not in request.files:
+            return jsonify({'error': 'No audio file provided'}), 400
+            
+        audio_file = request.files['audio']
+        if audio_file.filename == '':
+            return jsonify({'error': 'No selected file'}), 400
+            
+        # Create recordings directory if it doesn't exist
+        os.makedirs('recordings', exist_ok=True)
+        
+        # Save the file
+        filepath = os.path.join('recordings', audio_file.filename)
+        audio_file.save(filepath)
+        
+        return jsonify({'message': 'Recording saved successfully'})
+        
+    except Exception as e:
+        print('Error saving recording:', str(e))
+        return jsonify({'error': 'Failed to save recording'}), 500
 
 # ─────────────────────────────────────────
 # Entry Point

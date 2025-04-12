@@ -1,5 +1,5 @@
 import React from "react";
-import { BrowserRouter as Router, Routes, Route, Link } from "react-router-dom";
+import { BrowserRouter as Router, Routes, Route, Link, useNavigate } from "react-router-dom";
 
 // Pages
 import HomePage from "./components/HomePage";
@@ -7,30 +7,160 @@ import DoctorAuth from "./components/doctor/DoctorAuth";
 import PatientAuth from "./components/patient/PatientAuth";
 
 // Doctor pages
-import UploadReport from "./components/Doctor/UploadReport";
+import UploadReport from "./components/doctor/UploadReport";
 import ScheduleMeeting from "./components/doctor/ScheduleMeeting";
 import RegisterPatient from "./components/doctor/RegisterPatient";
+import ViewFeedbacks from "./components/doctor/ViewFeedbacks";
 
 // Patient pages
 import PatientDashboard from "./components/patient/PatientDashboard";
 import SelfAssessment from "./components/patient/SelfAssessment";
-import ViewPlan from "./components/patient/ViewPlan";
+import ViewPlan from "./components/patient/ViewPLan";
+import PatientScheduleMeeting from "./components/patient/PatientScheduleMeeting";
+import GiveFeedback from "./components/patient/GiveFeedback";
 
 // Doctor Dashboard
 function DoctorDashboard() {
+  const navigate = useNavigate();
+  const handleLogout = () => {
+    localStorage.removeItem("doctor");
+    navigate("/");
+  };
+
   return (
-    <div style={{ padding: "1rem" }}>
-      <h1>Doctor Dashboard</h1>
-      <nav style={{ marginBottom: "1rem" }}>
-        <Link to="/doctor/upload" style={{ marginRight: "1rem" }}>Upload Report</Link>
-        <Link to="/doctor/schedule" style={{ marginRight: "1rem" }}>Schedule Meeting</Link>
-        <Link to="/doctor/register">Register Patient</Link>
+    <div style={{
+      minHeight: "100vh",
+      width: "100vw",
+      margin: 0,
+      padding: 0,
+      background: "linear-gradient(135deg, #f0f4ff 0%, #e6eeff 50%, #f0f4ff 100%)",
+      position: "fixed",
+      top: 0,
+      left: 0,
+      right: 0,
+      bottom: 0,
+      overflow: "auto"
+    }}>
+      {/* Navigation Bar */}
+      <nav style={{
+        padding: "0.75rem 1.5rem",
+        background: "white",
+        boxShadow: "0 1px 2px rgba(0,0,0,0.1)",
+        display: "flex",
+        justifyContent: "space-between",
+        alignItems: "center",
+        marginBottom: "1rem"
+      }}>
+        <div style={{
+          display: "flex",
+          alignItems: "center",
+          gap: "2rem"
+        }}>
+          <h1 style={{
+            fontSize: "20px",
+            color: "#1e40af",
+            margin: 0,
+            fontWeight: "700"
+          }}>Doctor Dashboard</h1>
+          <div style={{
+            display: "flex",
+            gap: "1rem"
+          }}>
+            <Link
+              to="/doctor/upload"
+              style={{
+                color: "#4b5563",
+                textDecoration: "none",
+                fontSize: "14px",
+                fontWeight: "500",
+                padding: "0.4rem 0.75rem",
+                borderRadius: "6px",
+                transition: "all 0.2s ease"
+              }}
+            >
+              Upload Report
+            </Link>
+            <Link
+              to="/doctor/schedule"
+              style={{
+                color: "#4b5563",
+                textDecoration: "none",
+                fontSize: "14px",
+                fontWeight: "500",
+                padding: "0.4rem 0.75rem",
+                borderRadius: "6px",
+                transition: "all 0.2s ease"
+              }}
+            >
+              Schedule Meeting
+            </Link>
+            <Link
+              to="/doctor/register"
+              style={{
+                color: "#4b5563",
+                textDecoration: "none",
+                fontSize: "14px",
+                fontWeight: "500",
+                padding: "0.4rem 0.75rem",
+                borderRadius: "6px",
+                transition: "all 0.2s ease"
+              }}
+            >
+              Register Patient
+            </Link>
+            <Link
+              to="/doctor/feedbacks"
+              style={{
+                color: "#4b5563",
+                textDecoration: "none",
+                fontSize: "14px",
+                fontWeight: "500",
+                padding: "0.4rem 0.75rem",
+                borderRadius: "6px",
+                transition: "all 0.2s ease"
+              }}
+            >
+              View Feedbacks
+            </Link>
+          </div>
+        </div>
+        <div style={{
+          display: "flex",
+          alignItems: "center",
+          gap: "1rem"
+        }}>
+          <button
+            onClick={handleLogout}
+            style={{
+              color: "#dc2626",
+              background: "#fee2e2",
+              border: "none",
+              padding: "0.4rem 0.75rem",
+              borderRadius: "6px",
+              fontSize: "14px",
+              fontWeight: "500",
+              cursor: "pointer",
+              transition: "all 0.2s ease"
+            }}
+          >
+            Logout
+          </button>
+        </div>
       </nav>
-      <Routes>
-        <Route path="upload" element={<UploadReport />} />
-        <Route path="schedule" element={<ScheduleMeeting />} />
-        <Route path="register" element={<RegisterPatient />} />
-      </Routes>
+
+      {/* Main Content */}
+      <div style={{
+        maxWidth: "1200px",
+        margin: "2rem auto",
+        padding: "0 1.5rem"
+      }}>
+        <Routes>
+          <Route path="upload" element={<UploadReport />} />
+          <Route path="schedule" element={<ScheduleMeeting />} />
+          <Route path="register" element={<RegisterPatient />} />
+          <Route path="feedbacks" element={<ViewFeedbacks />} />
+        </Routes>
+      </div>
     </div>
   );
 }
@@ -51,7 +181,9 @@ function App() {
         <Route path="/patient/login" element={<PatientAuth />} />
         <Route path="/patient/dashboard" element={<PatientDashboard />} />
         <Route path="/patient/self-assessment" element={<SelfAssessment />} />
-        <Route path="/patient/view-plan" element={<ViewPlan fetchFromDatabase={true} />} />
+        <Route path="/patient/view-plan" element={<ViewPlan />} />
+        <Route path="/patient/schedule-meeting" element={<PatientScheduleMeeting />} />
+        <Route path="/patient/give-feedback" element={<GiveFeedback />} />
       </Routes>
     </Router>
   );

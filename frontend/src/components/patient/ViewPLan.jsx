@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useRef } from "react";
 import axios from "../../services/api";
 import { useNavigate } from "react-router-dom";
 
@@ -11,7 +11,15 @@ export default function ViewPlan() {
     const [showAssessment, setShowAssessment] = useState(false);
     const [isAssessmentExpanded, setIsAssessmentExpanded] = useState(false);
     const [isReferencesExpanded, setIsReferencesExpanded] = useState(false);
+    const [assessmentQuestions, setAssessmentQuestions] = useState([]);
+    const [currentRecording, setCurrentRecording] = useState(null);
+    const [recordings, setRecordings] = useState({});
+    const [isRecording, setIsRecording] = useState(null);
+    const mediaRecorderRef = useRef(null);
+    const audioChunksRef = useRef([]);
     const navigate = useNavigate();
+    const [showAlert, setShowAlert] = useState(false);
+    const alertTimeoutRef = useRef(null);
 
     const handleGeneratePlan = async () => {
         const username = localStorage.getItem("patient");
@@ -37,6 +45,17 @@ export default function ViewPlan() {
             setShowAssessment(false);
             setIsAssessmentExpanded(false);
             setIsReferencesExpanded(false);
+
+            // Reset recording states
+            setAssessmentQuestions([]);
+            setIsRecording(null);
+            if (mediaRecorderRef.current && mediaRecorderRef.current.state === "recording") {
+                mediaRecorderRef.current.stop();
+                mediaRecorderRef.current.stream.getTracks().forEach(track => track.stop());
+            }
+            mediaRecorderRef.current = null;
+            audioChunksRef.current = [];
+
         } catch (err) {
             alert("Failed to generate plan: " + (err.response?.data?.error || err.message));
         } finally {
@@ -44,9 +63,87 @@ export default function ViewPlan() {
         }
     };
 
+    const fetchAssessmentQuestions = async () => {
+        try {
+            const response = await axios.post("/get-assessment-questions", {
+                disorder_type: disorder
+            });
+            setAssessmentQuestions(response.data.questions);
+        } catch (error) {
+            console.error("Failed to fetch questions:", error);
+            alert("Failed to load questions");
+        }
+    };
+
+    const showTemporaryAlert = () => {
+        setShowAlert(true);
+        // Clear any existing timeout
+        if (alertTimeoutRef.current) {
+            clearTimeout(alertTimeoutRef.current);
+        }
+        // Hide alert after 1.5 seconds
+        alertTimeoutRef.current = setTimeout(() => {
+            setShowAlert(false);
+        }, 1500);
+    };
+
+    // Cleanup timeout on component unmount
+    useEffect(() => {
+        return () => {
+            if (alertTimeoutRef.current) {
+                clearTimeout(alertTimeoutRef.current);
+            }
+        };
+    }, []);
+
+    const startRecording = async (questionId) => {
+        try {
+            const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+            const mediaRecorder = new MediaRecorder(stream);
+            mediaRecorderRef.current = mediaRecorder;
+
+            const chunks = [];
+            mediaRecorder.ondataavailable = (e) => chunks.push(e.data);
+
+            mediaRecorder.onstop = async () => {
+                const blob = new Blob(chunks, { type: 'audio/wav' });
+                const formData = new FormData();
+                formData.append('audio', blob, `${questionId}.wav`);
+
+                try {
+                    await axios.post('/save-recording', formData);
+                    showTemporaryAlert(); // Show temporary alert instead of modal
+                } catch (error) {
+                    console.error('Error saving recording:', error);
+                    alert('Failed to save recording'); // Keep error alert as modal
+                }
+            };
+
+            mediaRecorder.start();
+            setIsRecording(questionId);
+        } catch (error) {
+            console.error('Error starting recording:', error);
+            alert('Could not access microphone');
+        }
+    };
+
+    const stopRecording = () => {
+        if (mediaRecorderRef.current && mediaRecorderRef.current.state === "recording") {
+            mediaRecorderRef.current.stop();
+            mediaRecorderRef.current.stream.getTracks().forEach(track => track.stop());
+            setIsRecording(null);
+        }
+    };
+
     useEffect(() => {
         handleGeneratePlan();
     }, [disorder]);
+
+    useEffect(() => {
+        if (showAssessment) {
+            fetchAssessmentQuestions();
+        }
+    }, [showAssessment]);
 
     const handleComplete = (weekNumber) => {
         const newCompletedWeeks = {
@@ -55,7 +152,6 @@ export default function ViewPlan() {
         };
         setCompletedWeeks(newCompletedWeeks);
 
-        // If marking as complete, collapse the tile
         if (!completedWeeks[weekNumber]) {
             setExpandedWeeks(prev => ({
                 ...prev,
@@ -63,7 +159,6 @@ export default function ViewPlan() {
             }));
         }
 
-        // Check if all weeks are completed
         const allWeeksCompleted = [1, 2, 3].every(week => newCompletedWeeks[week]);
         if (allWeeksCompleted) {
             setShowAssessment(true);
@@ -83,15 +178,26 @@ export default function ViewPlan() {
 
         while ((match = weekRegex.exec(planText)) !== null) {
             const weekNumber = parseInt(match[1]);
-            if (weekNumber <= 3) { // Only include weeks 1-3
+            if (weekNumber <= 3) {
                 const startIndex = match.index;
                 const nextWeekIndex = planText.indexOf("Week " + (weekNumber + 1) + ":", startIndex);
                 const endIndex = nextWeekIndex !== -1 ? nextWeekIndex : planText.length;
 
                 const weekContent = planText.substring(startIndex, endIndex).trim();
+
+                // Extract the full title from the first line
+                const firstLine = weekContent.split('\n')[0].trim();
+                const title = firstLine.replace(/\*\*/g, '').trim();
+
+                // Split the title into main title and subtitle if it contains " - "
+                const [mainTitle, ...subtitleParts] = title.split(' - ');
+                const subtitle = subtitleParts.join(' - ');
+
                 weeks.push({
                     number: weekNumber,
-                    content: weekContent
+                    content: weekContent,
+                    title: mainTitle,
+                    subtitle: subtitle || ''
                 });
             }
             lastIndex = match.index;
@@ -101,95 +207,27 @@ export default function ViewPlan() {
     };
 
     const formatContent = (content) => {
-        const sections = content.split('\n').map(line => line.trim()).filter(line => line);
+        const lines = content.split('\n');
+        const formattedContent = [];
 
-        return (
-            <div className="plan-content" style={{ fontSize: '14px' }}>
-                {sections.map((section, index) => {
-                    // Week title
-                    if (section.startsWith('Week')) {
-                        return <h3 key={index} style={{
-                            color: '#2c3e50',
-                            marginBottom: '16px',
-                            fontSize: '16px',
-                            fontWeight: '600'
-                        }}>{section.replace(/\*\*/g, '')}</h3>;
-                    }
+        lines.forEach((line, index) => {
+            const trimmedLine = line.trim();
+            if (!trimmedLine) return;
 
-                    // Main sections (Weekly Goal, Therapy Focus, etc.)
-                    if (section.includes('**') && !section.includes(':**')) {
-                        const cleanedSection = section.replace(/\*\*/g, '');
-                        if (cleanedSection.toLowerCase().includes('weekly goal')) {
-                            return (
-                                <div key={index} style={{ marginBottom: '12px' }}>
-                                    <span style={{
-                                        color: '#3182ce',
-                                        fontSize: '15px',
-                                        fontWeight: '600'
-                                    }}>• Weekly Goal:</span>
-                                    <p style={{
-                                        margin: '4px 0 0 16px',
-                                        color: '#4a5568',
-                                        lineHeight: '1.4'
-                                    }}>{cleanedSection.split(':')[1]?.trim()}</p>
-                                </div>
-                            );
-                        }
-                        return <div key={index} style={{
-                            color: '#3182ce',
-                            marginBottom: '8px',
-                            fontSize: '15px',
-                            fontWeight: '600'
-                        }}>• {cleanedSection}</div>;
-                    }
+            // Skip the title line as we're handling it separately
+            if (index === 0) return;
 
-                    // Numbered items (like "1. Tactile Exploration")
-                    if (/^\d+\./.test(section)) {
-                        return (
-                            <div key={index} style={{
-                                marginLeft: '16px',
-                                marginBottom: '12px',
-                                color: '#3182ce',
-                                fontSize: '15px',
-                                fontWeight: '600'
-                            }}>
-                                {section.replace(/\*\*/g, '')}
-                            </div>
-                        );
-                    }
+            const indentLevel = (line.match(/^\s*\*+\s*/) || [''])[0].length;
+            const cleanedLine = trimmedLine.replace(/\*\*/g, '').replace(/^\* /, '');
 
-                    // Subheadings with content
-                    if (section.includes(':**')) {
-                        const [heading, content] = section.split(':**').map(s => s.trim());
-                        return (
-                            <div key={index} style={{ marginBottom: '8px', marginLeft: '16px' }}>
-                                <span style={{
-                                    color: '#4a5568',
-                                    fontWeight: '600',
-                                    fontSize: '15px'
-                                }}>
-                                    {heading.replace(/\*\*/g, '')}:
-                                </span>
-                                <span style={{
-                                    marginLeft: '4px',
-                                    color: '#4a5568'
-                                }}>{content}</span>
-                            </div>
-                        );
-                    }
+            formattedContent.push({
+                text: cleanedLine,
+                type: indentLevel === 0 ? 'section' : 'item',
+                indent: Math.floor(indentLevel / 2)
+            });
+        });
 
-                    // Regular text
-                    return (
-                        <p key={index} style={{
-                            marginLeft: '32px',
-                            marginBottom: '8px',
-                            color: '#4a5568',
-                            lineHeight: '1.4'
-                        }}>{section.replace(/\*\*/g, '')}</p>
-                    );
-                })}
-            </div>
-        );
+        return formattedContent;
     };
 
     const toggleWeek = (weekNumber) => {
@@ -202,272 +240,334 @@ export default function ViewPlan() {
     const weeklyPlans = parseWeeklyPlans(plan);
 
     return (
-        <div style={{ padding: "2rem", maxWidth: "800px", margin: "auto" }}>
-            <h2 style={{
-                color: '#2d3748',
-                marginBottom: '24px',
-                fontSize: '24px',
-                fontWeight: '600'
-            }}>Personalized Weekly Therapy Plan</h2>
+        <div style={{
+            minHeight: "100vh",
+            width: "100vw",
+            margin: 0,
+            padding: 0,
+            background: "linear-gradient(135deg, #f0f4ff 0%, #e6eeff 50%, #f0f4ff 100%)",
+            position: "fixed",
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            overflow: "auto"
+        }}>
+            {/* Add temporary alert */}
+            {showAlert && (
+                <div style={{
+                    position: "fixed",
+                    top: "20px",
+                    right: "20px",
+                    background: "#4ade80",
+                    color: "white",
+                    padding: "12px 24px",
+                    borderRadius: "8px",
+                    boxShadow: "0 2px 4px rgba(0,0,0,0.1)",
+                    zIndex: 1000,
+                    animation: "fadeIn 0.3s ease-out"
+                }}>
+                    Recording saved successfully!
+                </div>
+            )}
 
-            <div style={{ marginBottom: "24px" }}>
-                <label style={{ fontWeight: 500, color: '#4a5568' }}>Select Disorder Type: </label>
-                <select
-                    value={disorder}
-                    onChange={(e) => setDisorder(e.target.value)}
+            {/* Navigation Bar */}
+            <nav style={{
+                padding: "0.75rem 1.5rem",
+                background: "white",
+                boxShadow: "0 1px 2px rgba(0,0,0,0.1)",
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+                marginBottom: "1rem"
+            }}>
+                <h1 style={{
+                    fontSize: "20px",
+                    color: "#1e40af",
+                    margin: 0,
+                    fontWeight: "700"
+                }}>Personalized Weekly Therapy Plan</h1>
+                <button
+                    onClick={() => navigate("/patient/dashboard")}
                     style={{
-                        marginLeft: "12px",
-                        padding: "6px 12px",
-                        borderRadius: "4px",
-                        border: "1px solid #e2e8f0",
+                        color: "#64748b",
+                        textDecoration: "none",
+                        fontWeight: "500",
                         fontSize: "14px",
-                        color: '#4a5568'
+                        padding: "0.4rem 0.75rem",
+                        borderRadius: "6px",
+                        border: "1px solid #e2e8f0",
+                        background: "transparent",
+                        cursor: "pointer",
+                        transition: "all 0.2s ease"
                     }}
-                >
-                    <option value="articulation">Articulation</option>
-                    <option value="fluency">Fluency</option>
-                    <option value="voice">Voice</option>
-                    <option value="language">Language</option>
-                    <option value="motor_speech">Motor Speech</option>
-                </select>
-            </div>
+                >Back to Dashboard</button>
+            </nav>
 
-            {loading ? (
-                <p>Generating plan...</p>
-            ) : (
-                <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
-                    {weeklyPlans.map((week) => (
-                        <div
-                            key={week.number}
-                            style={{
-                                border: "1px solid #e2e8f0",
-                                borderRadius: "8px",
-                                overflow: "hidden",
-                                boxShadow: "0 1px 3px rgba(0,0,0,0.1)",
-                                backgroundColor: completedWeeks[week.number] ? "#f0fff4" : "#f8fafc"
-                            }}
-                        >
-                            <div
-                                onClick={() => toggleWeek(week.number)}
-                                style={{
-                                    padding: "12px 16px",
-                                    backgroundColor: completedWeeks[week.number] ? "#c6f6d5" : "#f8fafc",
-                                    display: "flex",
-                                    justifyContent: "space-between",
-                                    alignItems: "center",
-                                    cursor: "pointer",
-                                    borderBottom: expandedWeeks[week.number] ? "1px solid #e2e8f0" : "none",
-                                    transition: "background-color 0.3s ease"
-                                }}
-                            >
-                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                    <h3 style={{
-                                        margin: 0,
-                                        color: completedWeeks[week.number] ? '#2f855a' : '#2d3748',
-                                        fontSize: '16px',
-                                        fontWeight: 600
-                                    }}>Week {week.number}</h3>
-                                    <span style={{
-                                        color: completedWeeks[week.number] ? '#2f855a' : '#4a5568',
-                                        fontSize: '16px'
-                                    }}>- {week.content.split('\n')[0].split(':**')[0].replace(/\*\*/g, '').split(':')[1]?.trim()}</span>
-                                </div>
-                                <span style={{
-                                    color: completedWeeks[week.number] ? '#2f855a' : '#4a5568',
-                                    fontSize: '14px'
-                                }}>{expandedWeeks[week.number] ? "▼" : "▶"}</span>
-                            </div>
-                            {expandedWeeks[week.number] && (
-                                <div style={{
-                                    padding: "16px",
-                                    backgroundColor: "white",
-                                    display: "flex",
-                                    flexDirection: "column"
-                                }}>
-                                    {formatContent(week.content)}
-                                    <button
-                                        onClick={(e) => {
-                                            e.stopPropagation();
-                                            handleComplete(week.number);
-                                        }}
-                                        style={{
-                                            alignSelf: "flex-end",
-                                            marginTop: "16px",
-                                            padding: "8px 16px",
-                                            backgroundColor: completedWeeks[week.number] ? "#48bb78" : "#3182ce",
-                                            color: "white",
-                                            border: "none",
-                                            borderRadius: "4px",
-                                            cursor: "pointer",
-                                            fontSize: "14px",
-                                            fontWeight: 500,
-                                            transition: "background-color 0.2s"
-                                        }}
-                                    >
-                                        {completedWeeks[week.number] ? "Completed ✓" : "Mark as Complete"}
-                                    </button>
-                                </div>
-                            )}
-                        </div>
-                    ))}
-
-                    {/* References Tile */}
-                    <div
+            {/* Main Content */}
+            <div style={{
+                maxWidth: "800px",
+                margin: "0 auto",
+                padding: "0 1.5rem"
+            }}>
+                {/* Disorder Type Selector */}
+                <div style={{
+                    background: "white",
+                    padding: "1rem",
+                    borderRadius: "8px",
+                    marginBottom: "1rem",
+                    boxShadow: "0 1px 2px rgba(0,0,0,0.05)"
+                }}>
+                    <label style={{
+                        fontSize: "14px",
+                        fontWeight: "500",
+                        color: "#4b5563",
+                        marginRight: "0.75rem"
+                    }}>Select Disorder Type:</label>
+                    <select
+                        value={disorder}
+                        onChange={(e) => setDisorder(e.target.value)}
                         style={{
+                            padding: "0.4rem 0.75rem",
+                            fontSize: "14px",
                             border: "1px solid #e2e8f0",
-                            borderRadius: "8px",
-                            overflow: "hidden",
-                            boxShadow: "0 1px 3px rgba(0,0,0,0.1)",
-                            backgroundColor: "#f8fafc",
-                            marginTop: "16px"
+                            borderRadius: "6px",
+                            color: "#1e293b",
+                            outline: "none"
                         }}
                     >
-                        <div
-                            onClick={() => setIsReferencesExpanded(!isReferencesExpanded)}
-                            style={{
-                                padding: "12px 16px",
-                                backgroundColor: "#f0f9ff",
-                                display: "flex",
-                                justifyContent: "space-between",
-                                alignItems: "center",
-                                cursor: "pointer",
-                                borderBottom: isReferencesExpanded ? "1px solid #e2e8f0" : "none",
-                                transition: "background-color 0.3s ease"
-                            }}
-                        >
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                <h3 style={{
-                                    margin: 0,
-                                    color: '#2b6cb0',
-                                    fontSize: '16px',
-                                    fontWeight: 600
-                                }}>References</h3>
-                                <span style={{
-                                    color: '#4a5568',
-                                    fontSize: '16px'
-                                }}>- Supporting Literature</span>
-                            </div>
-                            <span style={{
-                                color: '#4a5568',
-                                fontSize: '14px'
-                            }}>{isReferencesExpanded ? "▼" : "▶"}</span>
-                        </div>
-                        {isReferencesExpanded && (
-                            <div style={{
-                                padding: "16px",
-                                backgroundColor: "white"
-                            }}>
-                                <div style={{ fontSize: '14px', color: '#4a5568' }}>
-                                    <p style={{ marginBottom: '12px' }}>
-                                        [1] American Speech-Language-Hearing Association. (2016). Scope of practice in speech-language pathology.
-                                    </p>
-                                    <p style={{ marginBottom: '12px' }}>
-                                        [2] Guitar, B. (2013). Stuttering: An integrated approach to its nature and treatment.
-                                    </p>
-                                    <p style={{ marginBottom: '12px' }}>
-                                        [3] Yorkston, K. M., Beukelman, D. R., Strand, E. A., & Bell, K. R. (2010). Management of motor speech disorders in children and adults.
-                                    </p>
-                                </div>
-                            </div>
-                        )}
-                    </div>
+                        <option value="articulation">Articulation</option>
+                        <option value="fluency">Fluency</option>
+                        <option value="voice">Voice</option>
+                        <option value="language">Language</option>
+                        <option value="motor_speech">Motor Speech</option>
+                    </select>
+                </div>
 
-                    {showAssessment && (
-                        <div
-                            style={{
-                                border: "1px solid #e2e8f0",
-                                borderRadius: "8px",
-                                overflow: "hidden",
-                                boxShadow: "0 1px 3px rgba(0,0,0,0.1)",
-                                backgroundColor: "#f8fafc",
-                                marginTop: "16px"
-                            }}
-                        >
+                {loading ? (
+                    <div style={{
+                        background: "white",
+                        padding: "1rem",
+                        borderRadius: "8px",
+                        textAlign: "center",
+                        color: "#4b5563"
+                    }}>Generating plan...</div>
+                ) : (
+                    <div style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
+                        {/* Weekly Plans */}
+                        {weeklyPlans.map((week) => (
                             <div
-                                onClick={() => setIsAssessmentExpanded(!isAssessmentExpanded)}
+                                key={week.number}
                                 style={{
-                                    padding: "12px 16px",
-                                    backgroundColor: "#f0f9ff",
+                                    background: "white",
+                                    borderRadius: "8px",
+                                    overflow: "hidden",
+                                    boxShadow: "0 1px 2px rgba(0,0,0,0.05)"
+                                }}
+                            >
+                                <div
+                                    onClick={() => toggleWeek(week.number)}
+                                    style={{
+                                        padding: "1rem",
+                                        backgroundColor: completedWeeks[week.number] ? "#f0fdf4" : "#f8fafc",
+                                        display: "flex",
+                                        justifyContent: "space-between",
+                                        alignItems: "center",
+                                        cursor: "pointer",
+                                        borderBottom: expandedWeeks[week.number] ? "1px solid #e2e8f0" : "none"
+                                    }}
+                                >
+                                    <div style={{ flex: 1 }}>
+                                        <div style={{
+                                            display: "flex",
+                                            alignItems: "center",
+                                            gap: "0.75rem",
+                                            marginBottom: "0.25rem"
+                                        }}>
+                                            <h3 style={{
+                                                margin: 0,
+                                                fontSize: "16px",
+                                                fontWeight: "600",
+                                                color: completedWeeks[week.number] ? "#166534" : "#1e293b"
+                                            }}>{week.title}</h3>
+                                            {completedWeeks[week.number] && (
+                                                <span style={{
+                                                    fontSize: "12px",
+                                                    color: "#166534",
+                                                    background: "#dcfce7",
+                                                    padding: "0.25rem 0.5rem",
+                                                    borderRadius: "4px",
+                                                    fontWeight: "500"
+                                                }}>Completed</span>
+                                            )}
+                                        </div>
+                                        {week.subtitle && (
+                                            <p style={{
+                                                margin: "0.25rem 0 0 0",
+                                                fontSize: "14px",
+                                                color: "#6b7280",
+                                                fontStyle: "italic"
+                                            }}>
+                                                {week.subtitle}
+                                            </p>
+                                        )}
+                                    </div>
+                                    <span style={{ color: "#64748b", marginLeft: "1rem" }}>
+                                        {expandedWeeks[week.number] ? "▼" : "▶"}
+                                    </span>
+                                </div>
+                                {expandedWeeks[week.number] && (
+                                    <div style={{ padding: "1.5rem" }}>
+                                        {formatContent(week.content).map((item, index) => (
+                                            <div
+                                                key={index}
+                                                style={{
+                                                    marginLeft: `${item.indent * 1.5}rem`,
+                                                    marginBottom: "0.75rem",
+                                                    color: item.type === 'section' ? "#1e40af" : "#4b5563",
+                                                    fontSize: item.type === 'section' ? "15px" : "14px",
+                                                    fontWeight: item.type === 'section' ? "600" : "400",
+                                                    lineHeight: "1.5"
+                                                }}
+                                            >
+                                                {item.text}
+                                            </div>
+                                        ))}
+                                        <div style={{
+                                            display: "flex",
+                                            justifyContent: "flex-end",
+                                            marginTop: "1.5rem"
+                                        }}>
+                                            <button
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    handleComplete(week.number);
+                                                }}
+                                                style={{
+                                                    padding: "0.5rem 1rem",
+                                                    fontSize: "14px",
+                                                    color: completedWeeks[week.number] ? "#dc2626" : "#166534",
+                                                    background: completedWeeks[week.number] ? "#fee2e2" : "#dcfce7",
+                                                    border: "none",
+                                                    borderRadius: "6px",
+                                                    cursor: "pointer",
+                                                    fontWeight: "500",
+                                                    transition: "all 0.2s ease"
+                                                }}
+                                            >
+                                                {completedWeeks[week.number] ? "Mark as Incomplete" : "Mark as Complete"}
+                                            </button>
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+                        ))}
+
+                        {/* References Section */}
+                        <div style={{
+                            background: "white",
+                            borderRadius: "8px",
+                            overflow: "hidden",
+                            boxShadow: "0 1px 2px rgba(0,0,0,0.05)"
+                        }}>
+                            <div
+                                onClick={() => setIsReferencesExpanded(!isReferencesExpanded)}
+                                style={{
+                                    padding: "1rem",
+                                    backgroundColor: "#f8fafc",
                                     display: "flex",
                                     justifyContent: "space-between",
                                     alignItems: "center",
-                                    cursor: "pointer",
-                                    borderBottom: isAssessmentExpanded ? "1px solid #e2e8f0" : "none",
-                                    transition: "background-color 0.3s ease"
+                                    cursor: "pointer"
                                 }}
                             >
-                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                    <h3 style={{
-                                        margin: 0,
-                                        color: '#2b6cb0',
-                                        fontSize: '16px',
-                                        fontWeight: 600
-                                    }}>Final Assessment</h3>
-                                    <span style={{
-                                        color: '#4a5568',
-                                        fontSize: '16px'
-                                    }}>- Evaluate Your Progress</span>
-                                </div>
-                                <span style={{
-                                    color: '#4a5568',
-                                    fontSize: '14px'
-                                }}>{isAssessmentExpanded ? "▼" : "▶"}</span>
+                                <h3 style={{
+                                    margin: 0,
+                                    fontSize: "16px",
+                                    fontWeight: "600",
+                                    color: "#1e293b"
+                                }}>References</h3>
+                                <span style={{ color: "#64748b" }}>
+                                    {isReferencesExpanded ? "▼" : "▶"}
+                                </span>
                             </div>
-                            {isAssessmentExpanded && (
-                                <div style={{
-                                    padding: "16px",
-                                    backgroundColor: "white",
-                                    display: "flex",
-                                    flexDirection: "column"
-                                }}>
-                                    <div style={{ fontSize: '14px', color: '#4a5568' }}>
-                                        <p style={{
-                                            fontSize: '15px',
-                                            fontWeight: '600',
-                                            color: '#2b6cb0',
-                                            marginBottom: '12px'
-                                        }}>
-                                            Congratulations on completing all weeks of your therapy plan!
+                            {isReferencesExpanded && (
+                                <div style={{ padding: "1rem" }}>
+                                    <div style={{
+                                        color: "#4b5563",
+                                        fontSize: "14px",
+                                        lineHeight: "1.5"
+                                    }}>
+                                        <p style={{ margin: "0.5rem 0" }}>
+                                            [1] American Speech-Language-Hearing Association. (2016). Scope of practice in speech-language pathology.
                                         </p>
-                                        <p style={{ marginBottom: '8px' }}>
-                                            The assessment section will be updated with specific evaluation tasks and measurements.
+                                        <p style={{ margin: "0.5rem 0" }}>
+                                            [2] Guitar, B. (2013). Stuttering: An integrated approach to its nature and treatment.
                                         </p>
-                                        {/* Placeholder for assessment content - to be updated later */}
-                                        <div style={{
-                                            padding: '12px',
-                                            backgroundColor: '#f7fafc',
-                                            borderRadius: '4px',
-                                            marginTop: '12px'
-                                        }}>
-                                            <p style={{ fontStyle: 'italic', color: '#718096' }}>
-                                                Assessment content will be provided soon...
-                                            </p>
-                                        </div>
+                                        <p style={{ margin: "0.5rem 0" }}>
+                                            [3] Yorkston, K. M., Beukelman, D. R., Strand, E. A., & Bell, K. R. (2010). Management of motor speech disorders in children and adults.
+                                        </p>
                                     </div>
                                 </div>
                             )}
                         </div>
-                    )}
-                </div>
-            )}
 
-            <button
-                onClick={() => navigate("/patient/dashboard")}
-                style={{
-                    marginTop: "24px",
-                    padding: "8px 16px",
-                    backgroundColor: "#3182ce",
-                    color: "white",
-                    border: "none",
-                    borderRadius: "4px",
-                    cursor: "pointer",
-                    fontSize: "14px",
-                    fontWeight: 500,
-                    transition: "background-color 0.2s"
-                }}
-            >
-                Back to Dashboard
-            </button>
+                        {/* Final Assessment Section */}
+                        {showAssessment && (
+                            <div style={{
+                                background: "white",
+                                borderRadius: "8px",
+                                padding: "1.5rem",
+                                marginBottom: "2rem",
+                                boxShadow: "0 1px 3px rgba(0,0,0,0.1)"
+                            }}>
+                                <h2 style={{
+                                    fontSize: "1.25rem",
+                                    color: "#1e40af",
+                                    marginBottom: "1.5rem"
+                                }}>
+                                    Final Assessment
+                                </h2>
+
+                                {assessmentQuestions.map((question, index) => (
+                                    <div
+                                        key={question.id}
+                                        style={{
+                                            marginBottom: "1.5rem",
+                                            padding: "1rem",
+                                            background: "#f8fafc",
+                                            borderRadius: "6px"
+                                        }}
+                                    >
+                                        <p style={{
+                                            fontSize: "1rem",
+                                            color: "#1e293b",
+                                            marginBottom: "1rem"
+                                        }}>
+                                            {index + 1}. {question.question}
+                                        </p>
+
+                                        <button
+                                            onClick={() => isRecording === question.id ? stopRecording() : startRecording(question.id)}
+                                            style={{
+                                                padding: "0.5rem 1rem",
+                                                background: isRecording === question.id ? "#ef4444" : "#2563eb",
+                                                color: "white",
+                                                border: "none",
+                                                borderRadius: "6px",
+                                                cursor: "pointer"
+                                            }}
+                                            disabled={isRecording !== null && isRecording !== question.id}
+                                        >
+                                            {isRecording === question.id ? "Stop Recording" : "Record Answer"}
+                                        </button>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+                    </div>
+                )}
+            </div>
         </div>
     );
 }
